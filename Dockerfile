@@ -14,6 +14,7 @@ LABEL org.opencontainers.image.revision=${GIT_SHA} \
       org.opencontainers.image.title="delivery-demo"
 
 RUN useradd --system --uid 10001 --no-create-home appuser
+RUN apt-get update && apt-get upgrade -y zlib1g && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY app ./app
