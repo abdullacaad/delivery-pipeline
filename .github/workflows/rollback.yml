@@ -1,0 +1,51 @@
+name: Manual rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to restore (blank = previous release recorded on the server)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.DEPLOY_URL }}
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    env:
+      TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Roll back
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          ssh "$TARGET" 'mkdir -p ~/app/scripts'
+          scp scripts/deploy.sh scripts/rollback.sh "$TARGET:~/app/scripts/"
+          printf '%s' "$GHCR_TOKEN" | ssh "$TARGET" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+          ssh "$TARGET" "bash ~/app/scripts/rollback.sh '$image' '$TAG'"
+
+      - name: Verify
+        if: vars.DEPLOY_URL != ''
+        run: curl -fsS --retry 5 --retry-delay 3 "${{ vars.DEPLOY_URL }}/health"
