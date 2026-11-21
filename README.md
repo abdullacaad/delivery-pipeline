@@ -65,6 +65,8 @@ The demo walks through:
 6. **Settings → Actions → General**: allow workflow read/write permissions (needed for GHCR push).
 7. After the first push, set the GHCR package visibility/access if the server pull is denied (package → Package settings → give the repo access).
 
+> **No server yet?** The deploy job skips itself when the `DEPLOY_HOST` secret is not set, so the workflow stays green — test, build, scan and publish still run. Add the deploy secrets above and the next push will deploy.
+
 ## 🔄 Demonstrating rollback in GitHub
 
 - **Auto-rollback**: Actions → CI/CD → *Run workflow* → `simulate_failure = candidate` (rejected, live untouched) or `live` (swapped, fails, previous tag restored; job turns red).
