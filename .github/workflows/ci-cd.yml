@@ -147,10 +147,15 @@ jobs:
       IMAGE: ${{ needs.build.outputs.image }}
       TAG: ${{ needs.build.outputs.tag }}
       TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Configure SSH
+        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_SSH_KEY != '' && env.DEPLOY_KNOWN_HOSTS != ''
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
@@ -160,17 +165,20 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Ship deploy scripts
+        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_SSH_KEY != '' && env.DEPLOY_KNOWN_HOSTS != ''
         run: |
           ssh "$TARGET" 'mkdir -p ~/app/scripts'
           scp scripts/deploy.sh scripts/rollback.sh "$TARGET:~/app/scripts/"
 
       - name: Let the server pull from GHCR
+        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_SSH_KEY != ''
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           printf '%s' "$GHCR_TOKEN" | ssh "$TARGET" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
 
       - name: Deploy (pre-flight gate + auto-rollback on server)
+        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_SSH_KEY != '' && env.DEPLOY_KNOWN_HOSTS != ''
         id: deploy
         run: |
           sim="${{ github.event.inputs.simulate_failure || 'none' }}"
